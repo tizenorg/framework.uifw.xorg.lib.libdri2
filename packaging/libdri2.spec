@@ -1,7 +1,7 @@
 Name:       libdri2
 Summary:    X.Org DRI2 Extension client library
 Version:    0.1.0
-Release:    11
+Release:    12
 Group:      System/Libraries
 License:    MIT
 Source0:    %{name}-%{version}.tar.gz

@@ -52,6 +52,8 @@ typedef struct
    unsigned int flags;
 } DRI2Buffer;
 
+_XFUNCPROTOBEGIN
+
 extern Bool
 DRI2QueryExtension(Display * display, int *eventBase, int *errorBase);
 
@@ -134,4 +136,7 @@ typedef struct {
 extern void
 DRI2SwapBuffersWithRegion(Display *dpy, XID drawable, XserverRegion region,
                 CARD64  *count);
+
+_XFUNCPROTOEND
+
 #endif
