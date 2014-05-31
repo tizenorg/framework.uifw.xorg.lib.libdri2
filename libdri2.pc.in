@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libdri2
+Description: DRI2 X library for the X Client
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -ldri2
+Cflags: -I${includedir} -I${includedir}/dri2
