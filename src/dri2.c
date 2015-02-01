@@ -84,7 +84,7 @@ static /* const */ XExtensionHooks dri2ExtensionHooks = {
   DRI2CloseDisplay,       /* close_display */
   DRI2WireToEvent,        /* wire_to_event */
   DRI2EventToWire,        /* event_to_wire */
-  NULL,              /* error */
+  DRI2Error,              /* error */
   NULL,                   /* error_string */
 };
 
@@ -274,6 +274,80 @@ DRI2QueryVersion(Display * dpy, int *major, int *minor)
 
    return True;
 }
+
+Bool
+DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor)
+{
+   XExtDisplayInfo *info = DRI2FindDisplay(dpy);
+   xDRI2QueryVersionReply rep;
+   xDRI2QueryVersionReq *req;
+   int i, nevents;
+   char* ptr;
+
+   XextCheckExtension(dpy, info, dri2ExtensionName, False);
+
+   LockDisplay(dpy);
+   GetReq(DRI2QueryVersion, req);
+   req->reqType = info->codes->major_opcode;
+   req->dri2ReqType = X_DRI2QueryVersion;
+   req->majorVersion = DRI2_MAJOR;
+   req->minorVersion = DRI2_MINOR;
+   if (!_XReply(dpy, (xReply *) & rep, 0, xFalse)) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+   *major = rep.majorVersion;
+   *minor = rep.minorVersion;
+   UnlockDisplay(dpy);
+   SyncHandle();
+
+   if (rep.majorVersion < check_major)
+       goto version_err;
+
+   if (rep.minorVersion < check_major)
+       goto version_err;
+
+   if((ptr=getenv("DRI2LOG")))
+   {
+       bEnableLog = atoi(ptr);
+   }
+
+   if (XextHasExtension(info)) {
+       *eventBase = info->codes->first_event;
+       *errorBase = info->codes->first_error;
+       return True;
+   }
+
+   switch (rep.minorVersion) {
+   case 1:
+       nevents = 0;
+       break;
+   case 2:
+       nevents = 1;
+       break;
+   case 3:
+   default:
+       nevents = 2;
+       break;
+   }
+
+#ifndef _EMUL_
+   for (i = 0; i < nevents; i++) {
+       XESetWireToEvent (dpy, info->codes->first_event + i, DRI2WireToEvent);
+       XESetEventToWire (dpy, info->codes->first_event + i, DRI2EventToWire);
+   }
+#endif
+
+   return True;
+
+version_err:
+
+   XextRemoveDisplay (dri2Info, dpy);
+
+   return False;
+}
+
 
 Bool
 DRI2Connect(Display * dpy, XID window, char **driverName, char **deviceName)
