@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2011 Samsung Electronics Co., Ltd All Rights Reserved
  * Copyright © 2007,2008 Red Hat, Inc.
- * 
+ *
  * Contact: Sangjin Lee <lsj119@samsung.com>, SooChan Lim <sc1.lim@samsung.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -52,11 +52,16 @@ typedef struct
    unsigned int flags;
 } DRI2Buffer;
 
+_XFUNCPROTOBEGIN
+
 extern Bool
 DRI2QueryExtension(Display * display, int *eventBase, int *errorBase);
 
 extern Bool
 DRI2QueryVersion(Display * display, int *major, int *minor);
+
+extern Bool
+DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor);
 
 extern Bool
 DRI2Connect(Display * display, XID window,
@@ -130,5 +135,11 @@ typedef struct {
     Drawable drawable;	/* drawable on which event was requested in event mask */
     int event_type;
 } DRI2BufferInvalidate;
+
+extern void
+DRI2SwapBuffersWithRegion(Display *dpy, XID drawable, XserverRegion region,
+                CARD64  *count);
+
+_XFUNCPROTOEND
 
 #endif

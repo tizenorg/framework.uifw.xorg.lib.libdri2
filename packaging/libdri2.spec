@@ -1,11 +1,9 @@
-#sbs-git:slp/pkgs/xorg/lib/libdri2 libdri2 0.1.0 a23f05ad3f1b312ca2cc8bfb55e661da2da0b12b
-
 Name:       libdri2
 Summary:    X.Org DRI2 Extension client library
-Version: 0.1.0
-Release:    9
+Version:    0.1.0
+Release:    13
 Group:      System/Libraries
-License:    Samsung Proprietary Licenses
+License:    MIT
 Source0:    %{name}-%{version}.tar.gz
 BuildRequires:  pkgconfig(dri2proto)
 BuildRequires:  pkgconfig(x11)
@@ -21,7 +19,8 @@ DRI2 Extension client library
 Summary:    X.Org DRI2 Extension client library (development library)
 Group:      System/Libraries
 Requires:   %{name} = %{version}-%{release}
-Requires:   libdri2
+Requires:   pkgconfig(dri2proto)
+Requires:   pkgconfig(xfixes)
 
 %description devel
 DRI2 Extension client library (development library)
@@ -33,24 +32,24 @@ DRI2 Extension client library (development library)
 
 %build
 
+%ifarch %{ix86}
+CFLAGS="$CFLAGS -D_EMUL_"
 %reconfigure --disable-static
+%else
+%reconfigure --disable-static
+%endif
 make %{?jobs:-j%jobs}
 
 %install
 rm -rf %{buildroot}
+mkdir -p %{buildroot}/usr/share/license
+cp -af COPYING %{buildroot}/usr/share/license/%{name}
 %make_install
-
-
-
-
-
-
-
-
 
 
 %files
 %defattr(-,root,root,-)
+/usr/share/license/%{name}
 %{_libdir}/libdri2.so.*
 %exclude %{_libdir}/dri2.h
 

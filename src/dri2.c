@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2011 Samsung Electronics Co., Ltd All Rights Reserved
  * Copyright © 2008 Red Hat, Inc.
- * 
+ *
  * Contact: Sangjin Lee <lsj119@samsung.com>, SooChan Lim <sc1.lim@samsung.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -154,7 +154,7 @@ DRI2WireToEvent(Display *dpy, XEvent *event, xEvent *wire)
 #if GFXLOG
         GFX_PERF("I");
 #endif
-        break;    
+        break;
     }
 #endif
     default:
@@ -216,7 +216,7 @@ DRI2QueryExtension(Display * dpy, int *eventBase, int *errorBase)
     {
         bEnableLog = atoi(ptr);
     }
-    
+
     if (XextHasExtension(info)) {
         *eventBase = info->codes->first_event;
         *errorBase = info->codes->first_error;
@@ -265,13 +265,89 @@ DRI2QueryVersion(Display * dpy, int *major, int *minor)
 	   break;
    }
 
+#ifndef _EMUL_
    for (i = 0; i < nevents; i++) {
        XESetWireToEvent (dpy, info->codes->first_event + i, DRI2WireToEvent);
        XESetEventToWire (dpy, info->codes->first_event + i, DRI2EventToWire);
    }
+#endif
 
    return True;
 }
+
+Bool
+DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor)
+{
+   XExtDisplayInfo *info = DRI2FindDisplay(dpy);
+   xDRI2QueryVersionReply rep;
+   xDRI2QueryVersionReq *req;
+   int i, nevents;
+   char* ptr;
+
+   XextCheckExtension(dpy, info, dri2ExtensionName, False);
+
+   LockDisplay(dpy);
+   GetReq(DRI2QueryVersion, req);
+   req->reqType = info->codes->major_opcode;
+   req->dri2ReqType = X_DRI2QueryVersion;
+   req->majorVersion = DRI2_MAJOR;
+   req->minorVersion = DRI2_MINOR;
+   if (!_XReply(dpy, (xReply *) & rep, 0, xFalse)) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+   *major = rep.majorVersion;
+   *minor = rep.minorVersion;
+   UnlockDisplay(dpy);
+   SyncHandle();
+
+   if (rep.majorVersion < check_major)
+       goto version_err;
+
+   if (rep.minorVersion < check_major)
+       goto version_err;
+
+   if((ptr=getenv("DRI2LOG")))
+   {
+       bEnableLog = atoi(ptr);
+   }
+
+   if (XextHasExtension(info)) {
+       *eventBase = info->codes->first_event;
+       *errorBase = info->codes->first_error;
+       return True;
+   }
+
+   switch (rep.minorVersion) {
+   case 1:
+       nevents = 0;
+       break;
+   case 2:
+       nevents = 1;
+       break;
+   case 3:
+   default:
+       nevents = 2;
+       break;
+   }
+
+#ifndef _EMUL_
+   for (i = 0; i < nevents; i++) {
+       XESetWireToEvent (dpy, info->codes->first_event + i, DRI2WireToEvent);
+       XESetEventToWire (dpy, info->codes->first_event + i, DRI2EventToWire);
+   }
+#endif
+
+   return True;
+
+version_err:
+
+   XextRemoveDisplay (dri2Info, dpy);
+
+   return False;
+}
+
 
 Bool
 DRI2Connect(Display * dpy, XID window, char **driverName, char **deviceName)
@@ -367,7 +443,7 @@ DRI2CreateDrawable(Display * dpy, XID drawable)
     LockDisplay(dpy);
 
     LOG("CREATE drawable:0x%x\n", (unsigned int)drawable);
-    
+
     GetReq(DRI2CreateDrawable, req);
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2CreateDrawable;
@@ -381,7 +457,7 @@ DRI2DestroyDrawable(Display * dpy, XID drawable)
 {
     XExtDisplayInfo *info = DRI2FindDisplay(dpy);
     xDRI2DestroyDrawableReq *req;
-    
+
     XextSimpleCheckExtension(dpy, info, dri2ExtensionName);
     XSync(dpy, False);
     LockDisplay(dpy);
@@ -418,7 +494,7 @@ DRI2GetBuffers(Display * dpy, XID drawable,
 
     LOG("GET-BUF drawable:0x%x, count:%d, attach:%d \n"
                 , (unsigned int)drawable, count, *attachments);
-    
+
     GetReqExtra(DRI2GetBuffers, count * 4, req);
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2GetBuffers;
@@ -485,7 +561,7 @@ DRI2GetBuffersWithFormat(Display * dpy, XID drawable,
 
     XextCheckExtension(dpy, info, dri2ExtensionName, False);
     LockDisplay(dpy);
-    
+
     GetReqExtra(DRI2GetBuffers, count * (4 * 2), req);
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2GetBuffersWithFormat;
@@ -540,7 +616,7 @@ DRI2CopyRegion(Display * dpy, XID drawable, XserverRegion region,
     XextSimpleCheckExtension(dpy, info, dri2ExtensionName);
 
     LOG("COPY-REGION drawable:0x%x, src:%d, dest:%d\n", (unsigned int)drawable, (int)src, (int)dest);
-    
+
     LockDisplay(dpy);
     GetReq(DRI2CopyRegion, req);
     req->reqType = info->codes->major_opcode;
@@ -586,7 +662,7 @@ void DRI2SwapBuffers(Display *dpy, XID drawable, CARD64 target_msc,
     LockDisplay(dpy);
 
     LOG("SWAP drawable:0x%x\n", (unsigned int)drawable);
-    
+
     GetReq(DRI2SwapBuffers, req);
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2SwapBuffers;
@@ -745,3 +821,34 @@ void DRI2SwapInterval(Display *dpy, XID drawable, int interval)
 }
 #endif
 
+#ifdef X_DRI2SwapBuffersWithRegion
+void DRI2SwapBuffersWithRegion(Display *dpy, XID drawable, XserverRegion region,
+                CARD64 *count)
+{
+    XExtDisplayInfo *info = DRI2FindDisplay(dpy);
+    xDRI2SwapBuffersWithRegionReq *req;
+    xDRI2SwapBuffersReply rep;
+
+    XextSimpleCheckExtension (dpy, info, dri2ExtensionName);
+    LockDisplay(dpy);
+
+    LOG("SWAP drawable:0x%x\n", (unsigned int)drawable);
+
+    GetReq(DRI2SwapBuffersWithRegion, req);
+    req->reqType = info->codes->major_opcode;
+    req->dri2ReqType = X_DRI2SwapBuffersWithRegion;
+    req->drawable = drawable;
+    req->region = region;
+
+    _XReply(dpy, (xReply *)&rep, 0, xFalse);
+
+    *count = vals_to_card64(rep.swap_lo, rep.swap_hi);
+
+#if GFXLOG
+    GFX_PERF("DRAW_E");
+#endif
+
+    UnlockDisplay(dpy);
+    SyncHandle();
+}
+#endif
