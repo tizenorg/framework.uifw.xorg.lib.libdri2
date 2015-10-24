@@ -61,7 +61,7 @@ extern Bool
 DRI2QueryVersion(Display * display, int *major, int *minor);
 
 extern Bool
-DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor);
+DRI2QueryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor);
 
 extern Bool
 DRI2Connect(Display * display, XID window,

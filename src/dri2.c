@@ -210,12 +210,14 @@ Bool
 DRI2QueryExtension(Display * dpy, int *eventBase, int *errorBase)
 {
     XExtDisplayInfo *info = DRI2FindDisplay(dpy);
+#ifdef _DRI2LOG_
     char* ptr;
 
     if((ptr=getenv("DRI2LOG")))
     {
         bEnableLog = atoi(ptr);
     }
+#endif //_DRI2LOG_
 
     if (XextHasExtension(info)) {
         *eventBase = info->codes->first_event;
@@ -238,6 +240,12 @@ DRI2QueryVersion(Display * dpy, int *major, int *minor)
 
    LockDisplay(dpy);
    GetReq(DRI2QueryVersion, req);
+   if (!req) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+
    req->reqType = info->codes->major_opcode;
    req->dri2ReqType = X_DRI2QueryVersion;
    req->majorVersion = DRI2_MAJOR;
@@ -276,18 +284,26 @@ DRI2QueryVersion(Display * dpy, int *major, int *minor)
 }
 
 Bool
-DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor)
+DRI2QueryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase, int *major, int *minor, int check_major, int check_minor)
 {
    XExtDisplayInfo *info = DRI2FindDisplay(dpy);
    xDRI2QueryVersionReply rep;
    xDRI2QueryVersionReq *req;
    int i, nevents;
+#ifdef _DRI2LOG_
    char* ptr;
+#endif //_DRI2LOG_
 
    XextCheckExtension(dpy, info, dri2ExtensionName, False);
 
    LockDisplay(dpy);
    GetReq(DRI2QueryVersion, req);
+   if (!req) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+
    req->reqType = info->codes->major_opcode;
    req->dri2ReqType = X_DRI2QueryVersion;
    req->majorVersion = DRI2_MAJOR;
@@ -308,10 +324,12 @@ DRI2QeuryExtensionAndCheckVersion(Display * dpy, int *eventBase, int *errorBase,
    if (rep.minorVersion < check_major)
        goto version_err;
 
+#ifdef _DRI2LOG_
    if((ptr=getenv("DRI2LOG")))
    {
        bEnableLog = atoi(ptr);
    }
+#endif //_DRI2LOG_
 
    if (XextHasExtension(info)) {
        *eventBase = info->codes->first_event;
@@ -360,6 +378,12 @@ DRI2Connect(Display * dpy, XID window, char **driverName, char **deviceName)
 
    LockDisplay(dpy);
    GetReq(DRI2Connect, req);
+   if (!req) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+
    req->reqType = info->codes->major_opcode;
    req->dri2ReqType = X_DRI2Connect;
    req->window = window;
@@ -416,6 +440,12 @@ DRI2Authenticate(Display * dpy, XID window, unsigned int magic)
 
    LockDisplay(dpy);
    GetReq(DRI2Authenticate, req);
+   if (!req) {
+      UnlockDisplay(dpy);
+      SyncHandle();
+      return False;
+   }
+
    req->reqType = info->codes->major_opcode;
    req->dri2ReqType = X_DRI2Authenticate;
    req->window = window;
@@ -445,6 +475,12 @@ DRI2CreateDrawable(Display * dpy, XID drawable)
     LOG("CREATE drawable:0x%x\n", (unsigned int)drawable);
 
     GetReq(DRI2CreateDrawable, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2CreateDrawable;
     req->drawable = drawable;
@@ -465,6 +501,12 @@ DRI2DestroyDrawable(Display * dpy, XID drawable)
     LOG("DESTROY drawable:0x%x\n", (unsigned int)drawable);
 
     GetReq(DRI2DestroyDrawable, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2DestroyDrawable;
     req->drawable = drawable;
@@ -484,6 +526,7 @@ DRI2GetBuffers(Display * dpy, XID drawable,
     xDRI2Buffer repBuffer;
     CARD32 *p;
     int i;
+    unsigned int j;
 
     XextCheckExtension(dpy, info, dri2ExtensionName, False);
     LockDisplay(dpy);
@@ -496,6 +539,12 @@ DRI2GetBuffers(Display * dpy, XID drawable,
                 , (unsigned int)drawable, count, *attachments);
 
     GetReqExtra(DRI2GetBuffers, count * 4, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return NULL;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2GetBuffers;
     req->drawable = drawable;
@@ -522,16 +571,16 @@ DRI2GetBuffers(Display * dpy, XID drawable,
         return NULL;
     }
 
-    for (i = 0; i < rep.count; i++) {
+    for (j = 0; j < rep.count; j++) {
         _XReadPad(dpy, (char *) &repBuffer, sizeof repBuffer);
-        buffers[i].attachment = repBuffer.attachment;
-        buffers[i].name = repBuffer.name;
-        buffers[i].pitch = repBuffer.pitch;
-        buffers[i].cpp = repBuffer.cpp;
-        buffers[i].flags = repBuffer.flags;
+        buffers[j].attachment = repBuffer.attachment;
+        buffers[j].name = repBuffer.name;
+        buffers[j].pitch = repBuffer.pitch;
+        buffers[j].cpp = repBuffer.cpp;
+        buffers[j].flags = repBuffer.flags;
 
         LOG("\t\t New attach:%d name:%d flags:0x%x width:%d, height:%d\n"
-                , buffers[i].attachment, buffers[i].name, buffers[i].flags, *width, *height);
+                , buffers[j].attachment, buffers[j].name, buffers[j].flags, *width, *height);
     }
 
 #if GFXLOG
@@ -558,11 +607,18 @@ DRI2GetBuffersWithFormat(Display * dpy, XID drawable,
     xDRI2Buffer repBuffer;
     CARD32 *p;
     int i;
+    unsigned int j;
 
     XextCheckExtension(dpy, info, dri2ExtensionName, False);
     LockDisplay(dpy);
 
     GetReqExtra(DRI2GetBuffers, count * (4 * 2), req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return NULL;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2GetBuffersWithFormat;
     req->drawable = drawable;
@@ -589,13 +645,13 @@ DRI2GetBuffersWithFormat(Display * dpy, XID drawable,
         return NULL;
     }
 
-    for (i = 0; i < rep.count; i++) {
+    for (j = 0; j < rep.count; j++) {
         _XReadPad(dpy, (char *) &repBuffer, sizeof repBuffer);
-        buffers[i].attachment = repBuffer.attachment;
-        buffers[i].name = repBuffer.name;
-        buffers[i].pitch = repBuffer.pitch;
-        buffers[i].cpp = repBuffer.cpp;
-        buffers[i].flags = repBuffer.flags;
+        buffers[j].attachment = repBuffer.attachment;
+        buffers[j].name = repBuffer.name;
+        buffers[j].pitch = repBuffer.pitch;
+        buffers[j].cpp = repBuffer.cpp;
+        buffers[j].flags = repBuffer.flags;
     }
 
     UnlockDisplay(dpy);
@@ -619,6 +675,12 @@ DRI2CopyRegion(Display * dpy, XID drawable, XserverRegion region,
 
     LockDisplay(dpy);
     GetReq(DRI2CopyRegion, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2CopyRegion;
     req->drawable = drawable;
@@ -664,6 +726,12 @@ void DRI2SwapBuffers(Display *dpy, XID drawable, CARD64 target_msc,
     LOG("SWAP drawable:0x%x\n", (unsigned int)drawable);
 
     GetReq(DRI2SwapBuffers, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2SwapBuffers;
     req->drawable = drawable;
@@ -694,6 +762,12 @@ Bool DRI2GetMSC(Display *dpy, XID drawable, CARD64 *ust, CARD64 *msc,
 
     LockDisplay(dpy);
     GetReq(DRI2GetMSC, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return False;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2GetMSC;
     req->drawable = drawable;
@@ -739,6 +813,12 @@ Bool DRI2WaitMSC(Display *dpy, XID drawable, CARD64 target_msc, CARD64 divisor,
 
     LockDisplay(dpy);
     GetReq(DRI2WaitMSC, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return False;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2WaitMSC;
     req->drawable = drawable;
@@ -780,6 +860,12 @@ Bool DRI2WaitSBC(Display *dpy, XID drawable, CARD64 target_sbc, CARD64 *ust,
 
     LockDisplay(dpy);
     GetReq(DRI2WaitSBC, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return False;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2WaitSBC;
     req->drawable = drawable;
@@ -812,6 +898,12 @@ void DRI2SwapInterval(Display *dpy, XID drawable, int interval)
 
     LockDisplay(dpy);
     GetReq(DRI2SwapInterval, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2SwapInterval;
     req->drawable = drawable;
@@ -835,6 +927,12 @@ void DRI2SwapBuffersWithRegion(Display *dpy, XID drawable, XserverRegion region,
     LOG("SWAP drawable:0x%x\n", (unsigned int)drawable);
 
     GetReq(DRI2SwapBuffersWithRegion, req);
+    if (!req) {
+       UnlockDisplay(dpy);
+       SyncHandle();
+       return;
+    }
+
     req->reqType = info->codes->major_opcode;
     req->dri2ReqType = X_DRI2SwapBuffersWithRegion;
     req->drawable = drawable;
